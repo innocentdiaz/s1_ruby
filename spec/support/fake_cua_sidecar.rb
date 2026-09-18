@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Speaks the cua_s1_sidecar.py protocol without a model: config first, then
+# for each request the option whose text contains a word of the context wins.
+# With FAKE_CUA_LOG set, every context received is appended there, one per line.
+require "json"
+
+$stdout.sync = true
+puts JSON.generate(config: { "encoder" => "tinyx", "context_tokens" => 224, "option_tokens" => 96, "checkpoint" => ARGV[0] })
+while (line = $stdin.gets)
+  req = JSON.parse(line)
+  File.write(ENV["FAKE_CUA_LOG"], "#{JSON.generate(req["context"])}\n", mode: "a") if ENV["FAKE_CUA_LOG"]
+  hits = req["options"].map { |o| req["context"].split.count { |w| o.downcase.include?(w.downcase) } + 0.1 }
+  total = hits.sum
+  puts JSON.generate(probabilities: hits.map { |h| (h / total).round(4) })
+end
